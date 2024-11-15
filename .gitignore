@@ -1,0 +1,8 @@
+#VS 2022 Stuff
+ipch/
+*.aps
+*.ncp
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
