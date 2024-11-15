@@ -32,8 +32,43 @@ private:
 		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 	}
 
-	void initVulkan() {
+	void createInstance() {
+		//Optional struct provides Vulkan driver with app relevant info
+		VkApplicationInfo appInfo{};
+		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		appInfo.pApplicationName = "Hello Triangle";
+		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.pEngineName = "No Engine";
+		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.apiVersion = VK_API_VERSION_1_0;
 
+		//NOT OPTIONAL struct for creating global extention scope
+		VkInstanceCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		createInfo.pApplicationInfo = &appInfo;
+
+		//Since Vulkan is platform agnostic, we need an extension to specify the
+		//system we are using. GLFW has a method for getting the required extensions
+		//for its specific use.
+		uint32_t glfwExtensionCount = 0;
+		const char** glfwExtensions;
+		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+		
+		//Now add them to createInfo
+		createInfo.enabledExtensionCount = glfwExtensionCount;
+		createInfo.ppEnabledExtensionNames = glfwExtensions;
+		createInfo.enabledLayerCount = 0;
+
+		//Use createInfo to actually make an instance
+		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create instance!");
+		}
+	}
+
+	void initVulkan() {
+		//An instance is the connection between your app and Vulkan API.
+		//This "wakes up" the Api.
+		createInstance();
 	}
 
 	void mainLoop() {
@@ -44,12 +79,15 @@ private:
 	}
 
 	void cleanup() {
+		vkDestroyInstance(instance, nullptr);
+
 		glfwDestroyWindow(window);
 
 		glfwTerminate();
 	}
 
 	GLFWwindow* window;
+	VkInstance instance;
 };
 
 int main() {
