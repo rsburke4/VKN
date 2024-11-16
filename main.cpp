@@ -93,7 +93,7 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
 	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-	//Gets the total number of queues with supported flags
+	//Gets the INDEX of queues with supported flags
 	//Early termination means only the first supported queue is actually stored
 	int i = 0;
 	for (const auto& queueFamily : queueFamilies) {
@@ -250,22 +250,63 @@ private:
 		}
 		std::vector<VkPhysicalDevice> devices(deviceCount);
 		vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-		std::multimap<int, VkPhysicalDevice> candidates;
 
-		//Loop through devices and rate them
+		//Loop through devices and find best one
 		for (const auto& device : devices) {
-			//Picks the first suitable device based on score
-			int score = rateDeviceSuitability(device);
-			candidates.insert(std::make_pair(score, device));
+			if (isDeviceSuitable(device)) {
+				physicalDevice = device;
+				break;
+			}
 		}
 
-		//Check is the best candidate is available
-		if (candidates.rbegin()->first > 0) {
-			physicalDevice = candidates.rbegin()->second;
+		if (physicalDevice == VK_NULL_HANDLE) {
+			throw std::runtime_error("failed to find a suitable GPU!");
+		}
+	}
+
+	void createLogicalDevice() {
+		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+		//Grab a single queue, and add this to the device
+		//All we care about it graphics ability right now.
+		VkDeviceQueueCreateInfo queueCreateInfo {};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+		//We cooouuuullldd add more than one queue per queue family selected, but
+		//this is mostly uneccesarry.
+		queueCreateInfo.queueCount = 1;
+
+		//Required priority level between 0 and 1
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		//We'll select which features from the PHYSICAL device we want to add
+		//to our LOGICAL device here-- later.
+		VkPhysicalDeviceFeatures deviceFeatures{};
+
+		//For now let's just make our logical device
+		VkDeviceCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+		createInfo.pEnabledFeatures = &deviceFeatures;
+
+		//This is all ignored by up-to-date Vulkan apps. Good to have though
+		createInfo.enabledExtensionCount = 0;
+		if (enableValidationLayers) {
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledExtensionNames = validationLayers.data();
 		}
 		else {
-			throw std::runtime_error("failed to find a suitable GPU");
+			createInfo.enabledLayerCount = 0;
 		}
+		
+		//And now we create our logical device!
+		if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create logical device!");
+		}
+
+		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
 	}
 
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
@@ -296,6 +337,7 @@ private:
 		createInstance();
 		setupDebugMessenger();
 		pickPhysicalDevice();
+		createLogicalDevice();
 	}
 
 	void mainLoop() {
@@ -306,7 +348,9 @@ private:
 	}
 
 	void cleanup() {
-
+		//This deletes logical devices. Even though the physical is the param
+		//Physical devices get killed when the instance is destroyed
+		vkDestroyDevice(device, nullptr);
 		if (enableValidationLayers) {
 			DestroyDebugUtilMessengerEXT(instance, debugMessenger, nullptr);
 		}
@@ -326,6 +370,11 @@ private:
 	//The physical device we will be using
 	//Destroyed when instance is destroyed
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	//Logical Device
+	VkDevice device;
+	//The graphics capable queue we will be using
+	VkQueue graphicsQueue;
+
 
 };
 
