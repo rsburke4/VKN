@@ -7,6 +7,7 @@
 #include <vector>
 #include <map>
 #include <optional>
+#include <set>
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -21,6 +22,17 @@ const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
+
+//Logic for finding supported queue familes
+//Optionals have NO VALUE until something is assigned
+struct QueueFamilyIndices {
+	std::optional<uint32_t> graphicsFamily;
+	std::optional<uint32_t> presentFamily;
+	bool isComplete() {
+		return graphicsFamily.has_value() && presentFamily.has_value();
+	}
+};
+
 
 //Because we want a degbug function in an extension, we need to load that function
 //because we don't know where the address of it is??
@@ -76,43 +88,6 @@ int rateDeviceSuitability(VkPhysicalDevice device) {
 	return score;
 }
 
-//Logic for finding supported queue familes
-//Optionals have NO VALUE until something is assigned
-struct QueueFamilyIndices {
-	std::optional<uint32_t> graphicsFamily;
-	bool isComplete() {
-		return graphicsFamily.has_value(); 
-	}
-};
-
-QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
-	QueueFamilyIndices indices;
-	uint32_t queueFamilyCount = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-	//List of all Queue families on device
-	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-
-	//Gets the INDEX of queues with supported flags
-	//Early termination means only the first supported queue is actually stored
-	int i = 0;
-	for (const auto& queueFamily : queueFamilies) {
-		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-			indices.graphicsFamily = i;
-		}
-		if (indices.isComplete()) {
-			break;
-		}
-		i++;
-	}
-	return indices;
-}
-
-bool isDeviceSuitable(VkPhysicalDevice device) {
-	QueueFamilyIndices indices = findQueueFamilies(device);
-	return indices.isComplete();
-}
-
 class HelloTriangleApplication {
 public:
 
@@ -146,6 +121,42 @@ private:
 
 		//Create actual window
 		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+	}
+
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+		QueueFamilyIndices indices;
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+		//List of all Queue families on device
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+		//Gets the INDEX of queues with supported flags
+		//Early termination means only the first supported queue is actually stored
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies) {
+			//Find queue family capable of supporting presentation
+			VkBool32 presentSupport;
+			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+			if (presentSupport) {
+				indices.presentFamily = i;
+			}
+
+			//Find queue family capable of supporting graphics
+			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+				indices.graphicsFamily = i;
+			}
+			if (indices.isComplete()) {
+				break;
+			}
+			i++;
+		}
+		return indices;
+	}
+
+	bool isDeviceSuitable(VkPhysicalDevice device) {
+		QueueFamilyIndices indices = findQueueFamilies(device);
+		return indices.isComplete();
 	}
 
 	bool checkValidationLayerSupport() {
@@ -265,9 +276,27 @@ private:
 	}
 
 	void createLogicalDevice() {
+
+		//Add necessary queues from selected queueFamilies
 		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
-		//Grab a single queue, and add this to the device
+		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+		std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
+		float queuePriority = 1.0f;
+		for (uint32_t queueFamily : uniqueQueueFamilies) {
+			VkDeviceQueueCreateInfo queueCreateInfo{};
+			queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			queueCreateInfo.queueFamilyIndex = queueFamily;
+			queueCreateInfo.queueCount = 1;
+			queueCreateInfo.pQueuePriorities = &queuePriority;
+
+			queueCreateInfos.push_back(queueCreateInfo);
+		}
+
+
+
+		/*//Grab a single queue, and add this to the device
 		//All we care about it graphics ability right now.
 		VkDeviceQueueCreateInfo queueCreateInfo {};
 		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -278,7 +307,7 @@ private:
 
 		//Required priority level between 0 and 1
 		float queuePriority = 1.0f;
-		queueCreateInfo.pQueuePriorities = &queuePriority;
+		queueCreateInfo.pQueuePriorities = &queuePriority;*/
 
 		//We'll select which features from the PHYSICAL device we want to add
 		//to our LOGICAL device here-- later.
@@ -287,15 +316,15 @@ private:
 		//For now let's just make our logical device
 		VkDeviceCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		createInfo.pQueueCreateInfos = &queueCreateInfo;
-		createInfo.queueCreateInfoCount = 1;
+		createInfo.pQueueCreateInfos = queueCreateInfos.data();
+		createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 		createInfo.pEnabledFeatures = &deviceFeatures;
 
 		//This is all ignored by up-to-date Vulkan apps. Good to have though
 		createInfo.enabledExtensionCount = 0;
 		if (enableValidationLayers) {
 			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-			createInfo.ppEnabledExtensionNames = validationLayers.data();
+			createInfo.ppEnabledLayerNames = validationLayers.data();
 		}
 		else {
 			createInfo.enabledLayerCount = 0;
@@ -307,6 +336,7 @@ private:
 		}
 
 		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+		vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 	}
 
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
@@ -331,11 +361,19 @@ private:
 		}
 	}
 
+	void createSurface() {
+		//GLFW makes this simple.
+		if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create window surface!");
+		}
+	}
+
 	void initVulkan() {
 		//An instance is the connection between your app and Vulkan API.
 		//This "wakes up" the Api.
 		createInstance();
 		setupDebugMessenger();
+		createSurface();
 		pickPhysicalDevice();
 		createLogicalDevice();
 	}
@@ -355,6 +393,7 @@ private:
 			DestroyDebugUtilMessengerEXT(instance, debugMessenger, nullptr);
 		}
 
+		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
 		glfwDestroyWindow(window);
 
@@ -363,6 +402,8 @@ private:
 
 	//Window where things are rendered
 	GLFWwindow* window;
+	//Surface (Like a logical link to the "physical" window)
+	VkSurfaceKHR surface;
 	//Instance of Vulkan we are using
 	VkInstance instance;
 	//Debug Messenger Extension we use for callbacks
@@ -374,7 +415,8 @@ private:
 	VkDevice device;
 	//The graphics capable queue we will be using
 	VkQueue graphicsQueue;
-
+	//The presentation queue we will be using
+	VkQueue presentQueue;
 
 };
 
