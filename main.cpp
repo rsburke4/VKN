@@ -709,6 +709,31 @@ private:
 			throw std::runtime_error("failed to create pipeline!");
 		}
 
+		VkGraphicsPipelineCreateInfo pipelineInfo{};
+		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipelineInfo.stageCount = 2; //Number of custom stages
+		pipelineInfo.pStages = shaderStages; //The custom stages themselves
+		pipelineInfo.pVertexInputState = &vertexInputInfo;
+		pipelineInfo.pInputAssemblyState = &inputAssembly;
+		pipelineInfo.pViewportState = &viewportState;
+		pipelineInfo.pRasterizationState = &rasterizer;
+		pipelineInfo.pMultisampleState = &multisampling;
+		pipelineInfo.pDepthStencilState = nullptr;
+		pipelineInfo.pColorBlendState = &colorBlending;
+		pipelineInfo.pDynamicState = &dynamicState;
+		pipelineInfo.layout = pipelineLayout;
+		//RenderPasses
+		pipelineInfo.renderPass = renderPass;
+		pipelineInfo.subpass = 0;
+
+		//This pipeline does not inherit from another pipeline
+		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+		pipelineInfo.basePipelineIndex = -1;
+
+		if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create a graphics pipeline!");
+		}
+
 		//Get rid of temp vulkan shader modules now
 		vkDestroyShaderModule(device, fragShaderModule, nullptr);
 		vkDestroyShaderModule(device, vertShaderModule, nullptr);
@@ -772,6 +797,7 @@ private:
 		pickPhysicalDevice();
 		createLogicalDevice();
 		createSwapChain();
+		createRenderPass();
 		createGraphicsPipeline();
 	}
 
@@ -835,6 +861,7 @@ private:
 	//Holds the pipeline layout
 	VkRenderPass renderPass;
 	VkPipelineLayout pipelineLayout;
+	VkPipeline graphicsPipeline;
 
 };
 
