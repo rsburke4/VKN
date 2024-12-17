@@ -6,3 +6,8 @@ ipch/
 *.opensdf
 *.sdf
 *.cachefile
+*.log
+*.tlog
+*.obj
+x64/
+.vs/
