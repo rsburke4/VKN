@@ -13,6 +13,9 @@
 #include <algorithm> // Necessary for std::clamp
 #include <fstream>
 
+//Custom headers for encapsulation
+#include "VulkanInstance.h"
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 const int32_t MAX_FRAMES_IN_FLIGHT = 2;
@@ -50,36 +53,6 @@ struct SwapChainSupportDetails {
 	std::vector<VkSurfaceFormatKHR> formats;
 	std::vector<VkPresentModeKHR> presentModes;
 };
-
-
-//Because we want a degbug function in an extension, we need to load that function
-//because we don't know where the address of it is??
-VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
-	const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-	const VkAllocationCallbacks* pAllocator,
-	VkDebugUtilsMessengerEXT* pDebugMessenger) {
-
-	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance,
-		"vkCreateDebugUtilsMessengerEXT");
-	if (func != nullptr) {
-		return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
-	}
-	else {
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-	}
-}
-
-//For similar reasons as above (which I don't fully understand yet)
-//We need a helper function to destroy the messenger too
-//Because this is an extension function.
-void DestroyDebugUtilMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
-	const VkAllocationCallbacks* pAllocator) {
-	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance,
-		"vkDestroyDebugUtilsMessengerEXT");
-	if (func != nullptr) {
-		func(instance, debugMessenger, pAllocator);
-	}
-}
 
 //Gives a score to physical devices to determine which is best
 //Based on what we want it to do
@@ -228,108 +201,16 @@ private:
 		return indices.isComplete() && extensionsSupported && swapChainAdequate;
 	}
 
-	bool checkValidationLayerSupport() {
-		//Get the total number of instancelayers
-		uint32_t layerCount;
-		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-		//Same function, but this time passing in a vector with preallocated size
-		std::vector<VkLayerProperties> availableLayers(layerCount);
-		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-		//For each layerName in validationLayers
-		for (const char* layerName : validationLayers) {
-			bool layerFound = false;
-
-			//For each layerProperty in availableLayers
-			for (const auto& layerProperties : availableLayers) {
-				if (strcmp(layerName, layerProperties.layerName) == 0) {
-					layerFound = true;
-					break;
-				}
-			}
-			if (!layerFound) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	std::vector<const char*> getRequiredExtensions() {
-		uint32_t glfwExtensionCount = 0;
-		const char** glfwExtensions;
-		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-		//Creates a vector out of the double pointer we made earlier. This is C style logic
-		//Vector starting pointer and ending address are provided.
-		std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-
-		if (enableValidationLayers) {
-			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		}
-
-		return extensions;
-	}
-
-	void createInstance() {
-		if (enableValidationLayers && !checkValidationLayerSupport()) {
-			throw std::runtime_error("validation layers requested, but not available!");
-		}
-
-		//Optional struct provides Vulkan driver with app relevant info
-		VkApplicationInfo appInfo{};
-		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName = "Hello Triangle";
-		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.pEngineName = "No Engine";
-		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.apiVersion = VK_API_VERSION_1_0;
-
-		//NOT OPTIONAL struct for creating global extention scope
-		VkInstanceCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-		createInfo.pApplicationInfo = &appInfo;
-
-		//Since Vulkan is platform agnostic, we need an extension to specify the
-		//system we are using. GLFW has a method for getting the required extensions
-		//for its specific use.
-		auto extensions = getRequiredExtensions();
-		createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-		createInfo.ppEnabledExtensionNames = extensions.data();
-		
-		//Now add them to createInfo
-		createInfo.enabledLayerCount = 0;
-
-		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-		//If validation layers are enabled, then you should add them now
-		if (enableValidationLayers) {
-			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-			createInfo.ppEnabledLayerNames = validationLayers.data();
-
-			populateDebugMessengerCreateInfo(debugCreateInfo);
-			createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugCreateInfo;
-		}
-		else {
-			createInfo.enabledLayerCount = 0;
-			createInfo.pNext = nullptr;
-		}
-
-		//Use createInfo to actually make an instance
-		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create instance!");
-		}
-	}
-
 	//We can choose any number of devices to do what we want.
 	void pickPhysicalDevice() {
 		uint32_t deviceCount = 0;
-		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+		vkEnumeratePhysicalDevices(vknInstance->getInstance(), &deviceCount, nullptr);
 
 		if (deviceCount == 0) {
 			throw std::runtime_error("failed to find GPUs with Vulkan support!");
 		}
 		std::vector<VkPhysicalDevice> devices(deviceCount);
-		vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+		vkEnumeratePhysicalDevices(vknInstance->getInstance(), &deviceCount, devices.data());
 
 		//Loop through devices and pick first suitable one
 		for (const auto& device : devices) {
@@ -515,16 +396,7 @@ private:
 		createInfo.pUserData = nullptr; //Optional
 	}
 
-	void setupDebugMessenger() {
-		if (!enableValidationLayers) return;
 
-		VkDebugUtilsMessengerCreateInfoEXT createInfo;
-		populateDebugMessengerCreateInfo(createInfo);
-
-		if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
-			throw std::runtime_error("failed to set up debug messenger!");
-		}
-	}
 
 	void cleanupSwapChain() {
 		for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
@@ -559,7 +431,7 @@ private:
 
 	void createSurface() {
 		//GLFW makes this simple.
-		if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+		if (glfwCreateWindowSurface(vknInstance->getInstance(), window, nullptr, &surface) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create window surface!");
 		}
 	}
@@ -1018,8 +890,8 @@ private:
 	void initVulkan() {
 		//An instance is the connection between your app and Vulkan API.
 		//This "wakes up" the Api.
-		createInstance();
-		setupDebugMessenger();
+		vknInstance = new vkn::VulkanInstance(enableValidationLayers);
+
 		createSurface();
 		pickPhysicalDevice();
 		createLogicalDevice();
@@ -1063,16 +935,17 @@ private:
 		//Physical devices get killed when the instance is destroyed
 		vkDestroyDevice(device, nullptr);
 
-		if (enableValidationLayers) {
-			DestroyDebugUtilMessengerEXT(instance, debugMessenger, nullptr);
-		}
+		vkDestroySurfaceKHR(vknInstance->getInstance(), surface, nullptr);
+		delete(vknInstance);
+		//vkDestroyInstance(instance, nullptr);
 
-		vkDestroySurfaceKHR(instance, surface, nullptr);
-		vkDestroyInstance(instance, nullptr);
 		glfwDestroyWindow(window);
 
 		glfwTerminate();
 	}
+
+	//Custom Classes for Encapsulation
+	vkn::VulkanInstance* vknInstance;
 
 	//Window where things are rendered
 	GLFWwindow* window;
@@ -1121,8 +994,6 @@ private:
 
 	//Manually detect when window is resized
 	bool framebufferResized = false;
-
-
 };
 
 int main() {
