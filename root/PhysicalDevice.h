@@ -30,6 +30,8 @@ namespace vkn {
 		~PhysicalDevice() {}
 
 		VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
+		QueueFamilyIndices findQueueFamilies(VkSurfaceKHR);
+		SwapChainSupportDetails querySwapChainSupport(VkSurfaceKHR);
 
 	private:
 		bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);

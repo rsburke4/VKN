@@ -15,6 +15,7 @@
 
 //Custom headers for encapsulation
 #include "VulkanInstance.h"
+#include "PhysicalDevice.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -36,23 +37,6 @@ const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
-
-//Logic for finding supported queue familes
-//Optionals have NO VALUE until something is assigned
-struct QueueFamilyIndices {
-	std::optional<uint32_t> graphicsFamily;
-	std::optional<uint32_t> presentFamily;
-	bool isComplete() {
-		return graphicsFamily.has_value() && presentFamily.has_value();
-	}
-};
-
-//We have to make sure our swap chain is supported by the surface.
-struct SwapChainSupportDetails {
-	VkSurfaceCapabilitiesKHR capabilities;
-	std::vector<VkSurfaceFormatKHR> formats;
-	std::vector<VkPresentModeKHR> presentModes;
-};
 
 //Gives a score to physical devices to determine which is best
 //Based on what we want it to do
@@ -77,22 +61,6 @@ int rateDeviceSuitability(VkPhysicalDevice device) {
 	}
 
 	return score;
-}
-//Checks if extensions are supported by a device
-bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
-	uint32_t extensionCount;
-	vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
-
-	std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-	vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
-
-	std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
-	
-	for (const auto& extension : availableExtensions) {
-		requiredExtensions.erase(extension.extensionName);
-	}
-
-	return requiredExtensions.empty();
 }
 
 class HelloTriangleApplication {
@@ -136,94 +104,6 @@ private:
 		app->framebufferResized = true;
 	}
 
-	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
-		QueueFamilyIndices indices;
-		uint32_t queueFamilyCount = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-		//List of all Queue families on device
-		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-
-		//Gets the INDEX of queues with supported flags
-		//Early termination means only the first supported queue is actually stored
-		int i = 0;
-		for (const auto& queueFamily : queueFamilies) {
-			//Find queue family capable of supporting presentation
-			VkBool32 presentSupport;
-			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
-			if (presentSupport) {
-				indices.presentFamily = i;
-			}
-
-			//Find queue family capable of supporting graphics
-			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-				indices.graphicsFamily = i;
-			}
-			if (indices.isComplete()) {
-				break;
-			}
-			i++;
-		}
-		return indices;
-	}
-
-	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
-		//Get supported device capabilities
-		SwapChainSupportDetails details;
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-		//Get surface supported formats
-		uint32_t formatCount;
-		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-		if (formatCount != 0) {
-			details.formats.resize(formatCount);
-			vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
-		}
-
-		//Get surface supported presentation modes
-		uint32_t presentModeCount;
-		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
-		if (presentModeCount != 0) {
-			details.presentModes.resize(presentModeCount);
-			vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
-		}
-		return details;
-	}
-
-	bool isDeviceSuitable(VkPhysicalDevice device) {
-		QueueFamilyIndices indices = findQueueFamilies(device);
-		bool extensionsSupported = checkDeviceExtensionSupport(device);
-		bool swapChainAdequate = false;
-		if (extensionsSupported) {
-			SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
-			swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-		}
-		return indices.isComplete() && extensionsSupported && swapChainAdequate;
-	}
-
-	//We can choose any number of devices to do what we want.
-	void pickPhysicalDevice() {
-		uint32_t deviceCount = 0;
-		vkEnumeratePhysicalDevices(vknInstance->getInstance(), &deviceCount, nullptr);
-
-		if (deviceCount == 0) {
-			throw std::runtime_error("failed to find GPUs with Vulkan support!");
-		}
-		std::vector<VkPhysicalDevice> devices(deviceCount);
-		vkEnumeratePhysicalDevices(vknInstance->getInstance(), &deviceCount, devices.data());
-
-		//Loop through devices and pick first suitable one
-		for (const auto& device : devices) {
-			if (isDeviceSuitable(device)) {
-				physicalDevice = device;
-				break;
-			}
-		}
-
-		if (physicalDevice == VK_NULL_HANDLE) {
-			throw std::runtime_error("failed to find a suitable GPU!");
-		}
-	}
 
 	//Selects a preferred 8bit SRGB colorspace when available, and something else
 	//When this is not available
@@ -276,7 +156,9 @@ private:
 	}
 
 	void createSwapChain() {
-		SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+		//SwapChainSupportDetails swapChainSupport = querySwapChainSupport(vknPhysicalDevice->getPhysicalDevice());
+		vkn::SwapChainSupportDetails swapChainSupport = vknPhysicalDevice->querySwapChainSupport(surface);
+
 
 		VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
 		VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
@@ -299,7 +181,8 @@ private:
 		createInfo.imageArrayLayers = 1; //Always 1 unless making stereoscopic 3D app
 		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; //Indicates we are rendering directly to this swapchain
 
-		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+		//QueueFamilyIndices indices = findQueueFamilies(vknPhysicalDevice->getPhysicalDevice());
+		vkn::QueueFamilyIndices indices = vknPhysicalDevice->findQueueFamilies(surface);
 		uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
 
 		//If the graphics and presentation queue families are different
@@ -339,7 +222,8 @@ private:
 	void createLogicalDevice() {
 
 		//Add necessary queues from selected queueFamilies
-		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+		//QueueFamilyIndices indices = findQueueFamilies(vknPhysicalDevice->getPhysicalDevice());
+		vkn::QueueFamilyIndices indices = vknPhysicalDevice->findQueueFamilies(surface);
 
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
@@ -377,7 +261,7 @@ private:
 		}
 		
 		//And now we create our logical device!
-		if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+		if (vkCreateDevice(vknPhysicalDevice->getPhysicalDevice(), &createInfo, nullptr, &device) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create logical device!");
 		}
 
@@ -720,7 +604,8 @@ private:
 
 	//Command pools manage the memory used in command buffers.
 	void createCommandPool() {
-		QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
+		//QueueFamilyIndices queueFamilyIndices = findQueueFamilies(vknPhysicalDevice->getPhysicalDevice());
+		vkn::QueueFamilyIndices queueFamilyIndices = vknPhysicalDevice->findQueueFamilies(surface);
 
 		//This is a command pool for the graphics queue. Should there not also be
 		//One for the presentation queue in case they are different? We'll see....
@@ -894,7 +779,10 @@ private:
 		createSurface();
 
 		//Device Selection
-		pickPhysicalDevice();
+		//pickPhysicalDevice();
+		vknPhysicalDevice = new vkn::PhysicalDevice(vknInstance, surface);
+
+
 		createLogicalDevice();
 		createSwapChain();
 		createImageViews();
@@ -957,8 +845,11 @@ private:
 	//Debug Messenger Extension we use for callbacks
 	VkDebugUtilsMessengerEXT debugMessenger;
 	//The physical device we will be using
+	
 	//Destroyed when instance is destroyed
-	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	//VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	vkn::PhysicalDevice* vknPhysicalDevice;
+
 	//Logical Device
 	VkDevice device;
 	//The graphics capable queue we will be using
