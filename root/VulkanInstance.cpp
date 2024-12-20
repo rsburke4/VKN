@@ -1,4 +1,4 @@
-#include "Instance.h"
+#include "VulkanInstance.h"
 #include <stdexcept>
 
 using namespace vkn;
