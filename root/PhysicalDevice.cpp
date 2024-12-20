@@ -28,10 +28,6 @@ PhysicalDevice::PhysicalDevice(VulkanInstance* vknInstance, VkSurfaceKHR surface
 	}
 }
 
-PhysicalDevice::~PhysicalDevice() {
-
-}
-
 QueueFamilyIndices PhysicalDevice::findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
 	QueueFamilyIndices indices;
 	uint32_t queueFamilyCount = 0;
@@ -61,6 +57,10 @@ QueueFamilyIndices PhysicalDevice::findQueueFamilies(VkPhysicalDevice device, Vk
 		i++;
 	}
 	return indices;
+}
+
+QueueFamilyIndices PhysicalDevice::findQueueFamilies(VkSurfaceKHR surface) {
+	return findQueueFamilies(this->getPhysicalDevice(), surface);
 }
 
 bool PhysicalDevice::checkDeviceExtensionSupport(VkPhysicalDevice device) {
@@ -99,6 +99,11 @@ SwapChainSupportDetails PhysicalDevice::querySwapChainSupport(VkPhysicalDevice d
 	}
 	return details;
 }
+
+SwapChainSupportDetails PhysicalDevice::querySwapChainSupport(VkSurfaceKHR surface) {
+	return querySwapChainSupport(this->getPhysicalDevice(), surface);
+}
+
 
 //Picks the device with the support we want
 //This includes queue families and such.
