@@ -891,8 +891,9 @@ private:
 		//An instance is the connection between your app and Vulkan API.
 		//This "wakes up" the Api.
 		vknInstance = new vkn::VulkanInstance(enableValidationLayers);
-
 		createSurface();
+
+		//Device Selection
 		pickPhysicalDevice();
 		createLogicalDevice();
 		createSwapChain();
