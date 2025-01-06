@@ -30,6 +30,7 @@ namespace vkn {
 		~PhysicalDevice() {}
 
 		VkPhysicalDevice getPhysicalDevice() { return physicalDevice; }
+		std::vector<const char*> getDeviceExtensions() { return deviceExtensions; }
 		QueueFamilyIndices findQueueFamilies(VkSurfaceKHR);
 		SwapChainSupportDetails querySwapChainSupport(VkSurfaceKHR);
 
