@@ -1,6 +1,8 @@
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
 #ifndef __LOGICAL_DEVICE_H__
 #define __LOGICAL_DEVICE_H__
-
 #include "PhysicalDevice.h"
 
 namespace vkn {
@@ -13,7 +15,10 @@ namespace vkn {
 			VkSurfaceKHR surface,
 			bool validationEnabled,
 			const std::vector<const char*> validationLayers);
-		~LogicalDevice() {}
+		~LogicalDevice();
+
+		void getDeviceQueue(uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue *pQueue);
+		VkDevice getDevice() { return device; }
 
 	private:
 		vkn::PhysicalDevice *physicalDevice;
@@ -22,4 +27,4 @@ namespace vkn {
 
 }
 
-#endif __LOGICAL_DEVICE_H__
+#endif
