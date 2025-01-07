@@ -50,4 +50,12 @@ namespace vkn {
 		//vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 	}
 
+	void LogicalDevice::getDeviceQueue(uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue *pQueue){
+		vkGetDeviceQueue(this->device, queueFamilyIndex, queueIndex, pQueue);
+	}
+
+	LogicalDevice::~LogicalDevice() {
+		vkDestroyDevice(device, nullptr);
+	}
+
 }

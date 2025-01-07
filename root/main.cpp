@@ -16,6 +16,7 @@
 //Custom headers for encapsulation
 #include "VulkanInstance.h"
 #include "PhysicalDevice.h"
+#include "LogicalDevice.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -156,7 +157,6 @@ private:
 	}
 
 	void createSwapChain() {
-		//SwapChainSupportDetails swapChainSupport = querySwapChainSupport(vknPhysicalDevice->getPhysicalDevice());
 		vkn::SwapChainSupportDetails swapChainSupport = vknPhysicalDevice->querySwapChainSupport(surface);
 
 
@@ -205,68 +205,18 @@ private:
 		createInfo.clipped = VK_TRUE; //If window is obscured, these pixels are ignored
 		//createInfo.oldSwapchain = VK_NULL_HANDLE; //This is a link to a depricated swap chain, if this swap chain is an updated one
 
-		if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
+		if (vkCreateSwapchainKHR(vknDevice->getDevice(), &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create swap chain!");
 		}
 
 		//Store handles to swap chain images in the member vector
-		vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+		vkGetSwapchainImagesKHR(vknDevice->getDevice(), swapChain, &imageCount, nullptr);
 		swapChainImages.resize(imageCount);
-		vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+		vkGetSwapchainImagesKHR(vknDevice->getDevice(), swapChain, &imageCount, swapChainImages.data());
 
 		//Store other swapchain info
 		swapChainImageFormat = surfaceFormat.format;
 		swapChainExtent = extent;
-	}
-
-	void createLogicalDevice() {
-
-		//Add necessary queues from selected queueFamilies
-		//QueueFamilyIndices indices = findQueueFamilies(vknPhysicalDevice->getPhysicalDevice());
-		vkn::QueueFamilyIndices indices = vknPhysicalDevice->findQueueFamilies(surface);
-
-		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-		std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
-
-		float queuePriority = 1.0f;
-		for (uint32_t queueFamily : uniqueQueueFamilies) {
-			VkDeviceQueueCreateInfo queueCreateInfo{};
-			queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			queueCreateInfo.queueFamilyIndex = queueFamily;
-			queueCreateInfo.queueCount = 1;
-			queueCreateInfo.pQueuePriorities = &queuePriority;
-
-			queueCreateInfos.push_back(queueCreateInfo);
-		}
-
-
-		//We'll select which features from the PHYSICAL device we want to add
-		//to our LOGICAL device here-- later.
-		VkPhysicalDeviceFeatures deviceFeatures{};
-
-		//For now let's just make our logical device
-		VkDeviceCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		createInfo.pQueueCreateInfos = queueCreateInfos.data();
-		createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-		createInfo.pEnabledFeatures = &deviceFeatures;
-		createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-		createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-		if (enableValidationLayers) {
-			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-			createInfo.ppEnabledLayerNames = validationLayers.data();
-		}
-		else {
-			createInfo.enabledLayerCount = 0;
-		}
-		
-		//And now we create our logical device!
-		if (vkCreateDevice(vknPhysicalDevice->getPhysicalDevice(), &createInfo, nullptr, &device) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create logical device!");
-		}
-
-		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-		vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 	}
 
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
@@ -280,18 +230,16 @@ private:
 		createInfo.pUserData = nullptr; //Optional
 	}
 
-
-
 	void cleanupSwapChain() {
 		for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
-			vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
+			vkDestroyFramebuffer(vknDevice->getDevice(), swapChainFramebuffers[i], nullptr);
 		}
 
 		for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-			vkDestroyImageView(device, swapChainImageViews[i], nullptr);
+			vkDestroyImageView(vknDevice->getDevice(), swapChainImageViews[i], nullptr);
 		}
 
-		vkDestroySwapchainKHR(device, swapChain, nullptr);
+		vkDestroySwapchainKHR(vknDevice->getDevice(), swapChain, nullptr);
 	}
 
 	void recreateSwapChain() {
@@ -303,7 +251,7 @@ private:
 			glfwWaitEvents();
 		}
 
-		vkDeviceWaitIdle(device);
+		vkDeviceWaitIdle(vknDevice->getDevice());
 
 		cleanupSwapChain();
 
@@ -342,7 +290,7 @@ private:
 			createInfo.subresourceRange.baseArrayLayer = 0;
 			createInfo.subresourceRange.layerCount = 1;
 
-			if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
+			if (vkCreateImageView(vknDevice->getDevice(), &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
 				throw std::runtime_error("failed to create image views!");
 			}
 		}
@@ -487,7 +435,7 @@ private:
 		pipelineLayoutInfo.pushConstantRangeCount = 0;
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
-		if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+		if (vkCreatePipelineLayout(vknDevice->getDevice(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create pipeline!");
 		}
 
@@ -512,13 +460,13 @@ private:
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 		pipelineInfo.basePipelineIndex = -1;
 
-		if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+		if (vkCreateGraphicsPipelines(vknDevice->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create a graphics pipeline!");
 		}
 
 		//Get rid of temp vulkan shader modules now
-		vkDestroyShaderModule(device, fragShaderModule, nullptr);
-		vkDestroyShaderModule(device, vertShaderModule, nullptr);
+		vkDestroyShaderModule(vknDevice->getDevice(), fragShaderModule, nullptr);
+		vkDestroyShaderModule(vknDevice->getDevice(), vertShaderModule, nullptr);
 	}
 
 	//Wrap compiled code into VkShaderModule for pipeline usage
@@ -529,7 +477,7 @@ private:
 		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
 		VkShaderModule shaderModule;
-		if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+		if (vkCreateShaderModule(vknDevice->getDevice(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
 			throw std::runtime_error("failes to create shader module!");
 		}
 		return shaderModule;
@@ -573,7 +521,7 @@ private:
 		renderPassInfo.dependencyCount = 1;
 		renderPassInfo.pDependencies = &dependency;
 
-		if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+		if (vkCreateRenderPass(vknDevice->getDevice(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create render pass!");
 		}
 
@@ -595,7 +543,7 @@ private:
 			framebufferInfo.height = swapChainExtent.height;
 			framebufferInfo.layers = 1;
 
-			if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i])
+			if (vkCreateFramebuffer(vknDevice->getDevice(), &framebufferInfo, nullptr, &swapChainFramebuffers[i])
 				!= VK_SUCCESS) {
 				throw std::runtime_error("failed to create framebuffer!");
 			}
@@ -614,7 +562,7 @@ private:
 		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
 
-		if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+		if (vkCreateCommandPool(vknDevice->getDevice(), &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create command pool!");
 		}
 	}
@@ -628,7 +576,7 @@ private:
 		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
 
-		if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+		if (vkAllocateCommandBuffers(vknDevice->getDevice(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
 			throw std::runtime_error("failed to allocate command buffers!");
 		}
 	}
@@ -697,19 +645,19 @@ private:
 		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS
-				|| vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS
-				|| vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+			if (vkCreateSemaphore(vknDevice->getDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS
+				|| vkCreateSemaphore(vknDevice->getDevice(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS
+				|| vkCreateFence(vknDevice->getDevice(), &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
 				throw std::runtime_error("failed to create semaphore or fence!");
 			}
 		}
 	}
 
 	void drawFrame() {
-		vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+		vkWaitForFences(vknDevice->getDevice(), 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
 		uint32_t imageIndex;
-		VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex); //Get next swapchain image
+		VkResult result = vkAcquireNextImageKHR(vknDevice->getDevice(), swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex); //Get next swapchain image
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 			recreateSwapChain();
@@ -719,7 +667,7 @@ private:
 			throw std::runtime_error("failed to aquire swap chain image!");
 		}
 		//Only reset the fences if we are submitting work
-		vkResetFences(device, 1, &inFlightFences[currentFrame]);
+		vkResetFences(vknDevice->getDevice(), 1, &inFlightFences[currentFrame]);
 
 		//Record command buffer
 		vkResetCommandBuffer(commandBuffers[currentFrame], 0); //Reset command buffer
@@ -782,8 +730,14 @@ private:
 		//pickPhysicalDevice();
 		vknPhysicalDevice = new vkn::PhysicalDevice(vknInstance, surface);
 
+		//Logical Device Creation
+		//could be cleaned up with encapsulation of VkQueue object
+		vknDevice = new vkn::LogicalDevice(vknPhysicalDevice, surface, enableValidationLayers, validationLayers);
+		vkn::QueueFamilyIndices indices = vknPhysicalDevice->findQueueFamilies(surface);
+		vknDevice->getDeviceQueue(indices.graphicsFamily.value(), 0, &graphicsQueue);
+		vknDevice->getDeviceQueue(indices.presentFamily.value(), 0, &presentQueue);
 
-		createLogicalDevice();
+
 		createSwapChain();
 		createImageViews();
 		createRenderPass();
@@ -801,28 +755,29 @@ private:
 			drawFrame();
 		}
 
-		vkDeviceWaitIdle(device);
+		vkDeviceWaitIdle(vknDevice->getDevice());
 	}
 
 	//Basically init, but backwards
 	void cleanup() {
 		cleanupSwapChain();
 
-		vkDestroyPipeline(device, graphicsPipeline, nullptr);
-		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-		vkDestroyRenderPass(device, renderPass, nullptr);
+		vkDestroyPipeline(vknDevice->getDevice(), graphicsPipeline, nullptr);
+		vkDestroyPipelineLayout(vknDevice->getDevice(), pipelineLayout, nullptr);
+		vkDestroyRenderPass(vknDevice->getDevice(), renderPass, nullptr);
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-			vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-			vkDestroyFence(device, inFlightFences[i], nullptr);
+			vkDestroySemaphore(vknDevice->getDevice(), imageAvailableSemaphores[i], nullptr);
+			vkDestroySemaphore(vknDevice->getDevice(), renderFinishedSemaphores[i], nullptr);
+			vkDestroyFence(vknDevice->getDevice(), inFlightFences[i], nullptr);
 		}
 
-		vkDestroyCommandPool(device, commandPool, nullptr);
+		vkDestroyCommandPool(vknDevice->getDevice(), commandPool, nullptr);
 
 		//This deletes logical devices. Even though the physical is the param
 		//Physical devices get killed when the instance is destroyed
-		vkDestroyDevice(device, nullptr);
+		delete(vknDevice);
+
 
 		vkDestroySurfaceKHR(vknInstance->getInstance(), surface, nullptr);
 		delete(vknInstance);
@@ -847,11 +802,11 @@ private:
 	//The physical device we will be using
 	
 	//Destroyed when instance is destroyed
-	//VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	vkn::PhysicalDevice* vknPhysicalDevice;
 
 	//Logical Device
-	VkDevice device;
+	vkn::LogicalDevice* vknDevice;
+
 	//The graphics capable queue we will be using
 	VkQueue graphicsQueue;
 	//The presentation queue we will be using
