@@ -17,6 +17,7 @@
 #include "VulkanInstance.h"
 #include "PhysicalDevice.h"
 #include "LogicalDevice.h"
+#include "SwapChain.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -105,120 +106,6 @@ private:
 		app->framebufferResized = true;
 	}
 
-
-	//Selects a preferred 8bit SRGB colorspace when available, and something else
-	//When this is not available
-	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
-		for (const auto& availableFormat : availableFormats) {
-			//FORMAT specifies the channels we want. RGBA etc. The COLORSPACE specifies whether this is linear or not
-			if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB
-				&& availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-				return availableFormat;
-			}
-		}
-		//If we don't get the one we want. Return whatever is first
-		//Probably a better way to select "runner-up than this"
-		return availableFormats[0];
-	}
-
-	//Similar function to chooseSwapSurfaceFormat, but for "VSync" mode
-	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
-		for (const auto& availablePresentMode : availablePresentModes) {
-			//Good mode for desktop. Uses a lot of energy.
-			if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-				return availablePresentMode;
-			}
-		}
-		//Guarenteed to be available, but may result in tearing
-		return VK_PRESENT_MODE_FIFO_KHR;
-	}
-
-	//Picks the resolution of the swap chain images
-	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
-		if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-			return capabilities.currentExtent;
-		}
-		else {
-			int width, height;
-			glfwGetFramebufferSize(window, &width, &height);
-
-			VkExtent2D actualExtent = {
-				static_cast<uint32_t>(width),
-				static_cast<uint32_t>(height)
-			};
-
-			actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width,
-				capabilities.maxImageExtent.width);
-			actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height,
-				capabilities.maxImageExtent.height);
-
-			return actualExtent;
-		}
-	}
-
-	void createSwapChain() {
-		vkn::SwapChainSupportDetails swapChainSupport = vknPhysicalDevice->querySwapChainSupport(surface);
-
-
-		VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-		VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-		VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
-
-		//Minimum number of images for the swap chain to function (plus one for no wait times)
-		//But capped to the max, unless there is no max (0)
-		uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-		if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
-			imageCount = swapChainSupport.capabilities.maxImageCount;
-		}
-
-		VkSwapchainCreateInfoKHR createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		createInfo.surface = surface;
-		createInfo.minImageCount = imageCount;
-		createInfo.imageFormat = surfaceFormat.format;
-		createInfo.imageColorSpace = surfaceFormat.colorSpace;
-		createInfo.imageExtent = extent;
-		createInfo.imageArrayLayers = 1; //Always 1 unless making stereoscopic 3D app
-		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; //Indicates we are rendering directly to this swapchain
-
-		//QueueFamilyIndices indices = findQueueFamilies(vknPhysicalDevice->getPhysicalDevice());
-		vkn::QueueFamilyIndices indices = vknPhysicalDevice->findQueueFamilies(surface);
-		uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
-
-		//If the graphics and presentation queue families are different
-		//Then sharing needs to be active
-		if (indices.graphicsFamily != indices.presentFamily) {
-			createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-			createInfo.queueFamilyIndexCount = 2;
-			createInfo.pQueueFamilyIndices = queueFamilyIndices;
-		}
-		//Otherwise no sharing is needed. Better performance.
-		else {
-			createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			createInfo.queueFamilyIndexCount = 0; //Optional
-			createInfo.pQueueFamilyIndices = nullptr;
-		}
-
-		createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-		createInfo.presentMode = presentMode;
-		createInfo.clipped = VK_TRUE; //If window is obscured, these pixels are ignored
-		//createInfo.oldSwapchain = VK_NULL_HANDLE; //This is a link to a depricated swap chain, if this swap chain is an updated one
-
-		if (vkCreateSwapchainKHR(vknDevice->getDevice(), &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create swap chain!");
-		}
-
-		//Store handles to swap chain images in the member vector
-		vkGetSwapchainImagesKHR(vknDevice->getDevice(), swapChain, &imageCount, nullptr);
-		swapChainImages.resize(imageCount);
-		vkGetSwapchainImagesKHR(vknDevice->getDevice(), swapChain, &imageCount, swapChainImages.data());
-
-		//Store other swapchain info
-		swapChainImageFormat = surfaceFormat.format;
-		swapChainExtent = extent;
-	}
-
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
 		createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -239,7 +126,7 @@ private:
 			vkDestroyImageView(vknDevice->getDevice(), swapChainImageViews[i], nullptr);
 		}
 
-		vkDestroySwapchainKHR(vknDevice->getDevice(), swapChain, nullptr);
+		delete(vknSwapChain);
 	}
 
 	void recreateSwapChain() {
@@ -255,7 +142,8 @@ private:
 
 		cleanupSwapChain();
 
-		createSwapChain();
+		//TODO Add reference to old swap chain. Differentiate between new and old swap chains
+		vknSwapChain = new vkn::SwapChain(vknPhysicalDevice, vknDevice, surface, window);
 		createImageViews();
 		createFramebuffers();
 
@@ -269,13 +157,13 @@ private:
 	}
 
 	void createImageViews() {
-		swapChainImageViews.resize(swapChainImages.size());
-		for (size_t i = 0; i < swapChainImages.size(); i++) {
+		swapChainImageViews.resize(vknSwapChain->getImages().size());
+		for (size_t i = 0; i < vknSwapChain->getImages().size(); i++) {
 			VkImageViewCreateInfo createInfo{};
 			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			createInfo.image = swapChainImages[i];
+			createInfo.image = vknSwapChain->getImages()[i];
 			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			createInfo.format = swapChainImageFormat;
+			createInfo.format = vknSwapChain->getFormat().format;
 
 			//We can "swizzle" channels around here
 			createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -485,7 +373,7 @@ private:
 
 	void createRenderPass() {
 		VkAttachmentDescription colorAttachment{};
-		colorAttachment.format = swapChainImageFormat;
+		colorAttachment.format = vknSwapChain->getFormat().format;
 		colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; //No multisampling (for now)
 		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; //What happens to data when we load a buffer
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; //What happens when we write
@@ -539,8 +427,8 @@ private:
 			framebufferInfo.renderPass = renderPass;
 			framebufferInfo.attachmentCount = 1;
 			framebufferInfo.pAttachments = attachments;
-			framebufferInfo.width = swapChainExtent.width;
-			framebufferInfo.height = swapChainExtent.height;
+			framebufferInfo.width = vknSwapChain->getExtent().width;
+			framebufferInfo.height = vknSwapChain->getExtent().height;
 			framebufferInfo.layers = 1;
 
 			if (vkCreateFramebuffer(vknDevice->getDevice(), &framebufferInfo, nullptr, &swapChainFramebuffers[i])
@@ -552,7 +440,6 @@ private:
 
 	//Command pools manage the memory used in command buffers.
 	void createCommandPool() {
-		//QueueFamilyIndices queueFamilyIndices = findQueueFamilies(vknPhysicalDevice->getPhysicalDevice());
 		vkn::QueueFamilyIndices queueFamilyIndices = vknPhysicalDevice->findQueueFamilies(surface);
 
 		//This is a command pool for the graphics queue. Should there not also be
@@ -596,7 +483,7 @@ private:
 		renderPassInfo.renderPass = renderPass;
 		renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
 		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = swapChainExtent;
+		renderPassInfo.renderArea.extent = vknSwapChain->getExtent();
 
 		VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
 		renderPassInfo.clearValueCount = 1;
@@ -610,8 +497,8 @@ private:
 		VkViewport viewport{};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
-		viewport.width = (float)swapChainExtent.width;
-		viewport.height = (float)swapChainExtent.height;
+		viewport.width = (float)vknSwapChain->getExtent().width;
+		viewport.height = (float)vknSwapChain->getExtent().height;
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -619,7 +506,7 @@ private:
 		//Scissor area
 		VkRect2D scissor{};
 		scissor.offset = { 0, 0 };
-		scissor.extent = swapChainExtent;
+		scissor.extent = vknSwapChain->getExtent();
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
 		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
@@ -657,7 +544,7 @@ private:
 		vkWaitForFences(vknDevice->getDevice(), 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
 		uint32_t imageIndex;
-		VkResult result = vkAcquireNextImageKHR(vknDevice->getDevice(), swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex); //Get next swapchain image
+		VkResult result = vkAcquireNextImageKHR(vknDevice->getDevice(), vknSwapChain->getSwapChain(), UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex); //Get next swapchain image
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 			recreateSwapChain();
@@ -701,7 +588,7 @@ private:
 		presentInfo.waitSemaphoreCount = 1;
 		presentInfo.pWaitSemaphores = signalSemaphores;
 
-		VkSwapchainKHR swapChains[] = { swapChain };
+		VkSwapchainKHR swapChains[] = { vknSwapChain->getSwapChain() };
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = swapChains;
 		presentInfo.pImageIndices = &imageIndex;
@@ -738,7 +625,8 @@ private:
 		vknDevice->getDeviceQueue(indices.presentFamily.value(), 0, &presentQueue);
 
 
-		createSwapChain();
+		vknSwapChain = new vkn::SwapChain(vknPhysicalDevice, vknDevice, surface, window);
+
 		createImageViews();
 		createRenderPass();
 		createGraphicsPipeline();
@@ -813,12 +701,14 @@ private:
 	VkQueue presentQueue;
 
 	//Swap Chain for rendering images
-	VkSwapchainKHR swapChain;
+	//VkSwapchainKHR swapChain;
 	//Handles of swapchain images
-	std::vector<VkImage> swapChainImages;
+	//std::vector<VkImage> swapChainImages;
 	//Other swapchain specific variables
-	VkFormat swapChainImageFormat;
-	VkExtent2D swapChainExtent;
+	//VkFormat swapChainImageFormat;
+	//VkExtent2D swapChainExtent;
+	vkn::SwapChain *vknSwapChain;
+
 	std::vector<VkImageView> swapChainImageViews;
 
 	//Holds the pipeline layout

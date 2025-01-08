@@ -18,6 +18,7 @@ namespace vkn {
 		VkSurfaceFormatKHR getFormat() { return surfaceFormat; }
 		VkPresentModeKHR getPresentMode() { return presentMode; }
 		VkSwapchainKHR getSwapChain() { return swapChain; }
+		const std::vector<VkImage>& getImages() { return images; };
 
 
 	private:
