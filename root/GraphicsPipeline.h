@@ -23,11 +23,10 @@ namespace vkn{
 		void setVertexShader(std::string vertex);
 		void setTesselationShader(std::string tesselation);
 		void setFragmentShader(std::string fragment);
-		void addRenderPass(RenderPass* pass);
-
 
 		void buildPipeline();
 		VkPipeline getPipeline() { return graphicsPipeline; }
+		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
 
 
 	private:
@@ -39,7 +38,7 @@ namespace vkn{
 		//TODO fallback shader for when no frag shader is present.
 		VkShaderModule fragmentShader = VK_NULL_HANDLE;
 		VkShaderModule tesselationShader = VK_NULL_HANDLE;
-		VkShaderModule geometryShader;
+		VkShaderModule geometryShader = VK_NULL_HANDLE;
 
 		VkPipeline graphicsPipeline;
 		VkPipelineLayout pipelineLayout;

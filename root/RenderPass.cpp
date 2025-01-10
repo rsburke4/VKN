@@ -4,6 +4,8 @@ namespace vkn {
 
 	RenderPass::RenderPass(LogicalDevice *logicalDevice, VkFormat format) {
 
+		device = logicalDevice;
+
 		VkAttachmentDescription colorAttachment{};
 		colorAttachment.format = format;
 		colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; //No multisampling (For now)
@@ -38,11 +40,15 @@ namespace vkn {
 		dependency.dstSubpass = 0;
 		dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		dependency.srcAccessMask = 0;
-		dependency.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 		renderPassInfo.dependencyCount = 1;
 		renderPassInfo.pDependencies = &dependency;
+
+		if (vkCreateRenderPass(device->getDevice(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create renderpass!");
+		}
 
 	}
 

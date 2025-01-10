@@ -35,9 +35,11 @@ namespace vkn {
 		createInfo.codeSize = code.size();
 		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
-		if (vkCreateShaderModule(device->getDevice(), &createInfo, nullptr, &vertexShader) != VK_SUCCESS) {
+		VkShaderModule shaderModule;
+		if (vkCreateShaderModule(device->getDevice(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create valid shader module!");
 		}
+		return shaderModule;
 	}
 
 	void GraphicsPipeline::setVertexShader(std::string vertex) {
@@ -46,13 +48,13 @@ namespace vkn {
 	}
 
 
-	void GraphicsPipeline::setTesselationShader(std::string vertex) {
-		std::vector<char> shaderCode = readShaderFile(vertex);
+	void GraphicsPipeline::setTesselationShader(std::string tess) {
+		std::vector<char> shaderCode = readShaderFile(tess);
 		tesselationShader = createShaderModule(shaderCode);
 	}
 
-	void GraphicsPipeline::setFragmentShader(std::string vertex) {
-		std::vector<char> shaderCode = readShaderFile(vertex);
+	void GraphicsPipeline::setFragmentShader(std::string frag) {
+		std::vector<char> shaderCode = readShaderFile(frag);
 		fragmentShader = createShaderModule(shaderCode);
 	}
 
@@ -140,9 +142,9 @@ namespace vkn {
 		VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 		//What channels should the blending apply to?
 		colorBlendAttachment.colorWriteMask =
-			VK_COLOR_COMPONENT_R_BIT ||
-			VK_COLOR_COMPONENT_G_BIT ||
-			VK_COLOR_COMPONENT_B_BIT ||
+			VK_COLOR_COMPONENT_R_BIT |
+			VK_COLOR_COMPONENT_G_BIT |
+			VK_COLOR_COMPONENT_B_BIT |
 			VK_COLOR_COMPONENT_A_BIT;
 		colorBlendAttachment.blendEnable = VK_TRUE;
 		//These params determine how blending should occur
@@ -210,9 +212,13 @@ namespace vkn {
 		pipelineInfo.pMultisampleState = &multisampling;
 		pipelineInfo.pDepthStencilState = nullptr;
 		pipelineInfo.pColorBlendState = &colorBlending;
+		pipelineInfo.pDynamicState = &dynamicState;
 		pipelineInfo.layout = pipelineLayout;
+
 		pipelineInfo.renderPass = renderPass->getRenderPass();
 		pipelineInfo.subpass = 0; //Index of the subpass that this pipeline will render to
+
+		//This pipeline does not inherit from another pipeline
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 		pipelineInfo.basePipelineIndex = -1; //optional
 
