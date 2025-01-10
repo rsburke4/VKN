@@ -11,7 +11,7 @@ namespace vkn {
 	public:
 		//Fill out default constructor
 		LogicalDevice() {}
-		LogicalDevice(vkn::PhysicalDevice *device,
+		LogicalDevice(vkn::PhysicalDevice *physDevice,
 			VkSurfaceKHR surface,
 			bool validationEnabled,
 			const std::vector<const char*> validationLayers);

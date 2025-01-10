@@ -3,12 +3,12 @@
 
 namespace vkn {
 
-	LogicalDevice::LogicalDevice(vkn::PhysicalDevice *physicalDevice, 
+	LogicalDevice::LogicalDevice(vkn::PhysicalDevice *physDevice, 
 		VkSurfaceKHR surface, 
 		bool validationEnabled, 
 		const std::vector<const char*> validationLayers) {
 
-		physicalDevice = physicalDevice;
+		physicalDevice = physDevice;
 
 		vkn::QueueFamilyIndices indices = physicalDevice->findQueueFamilies(surface);
 
