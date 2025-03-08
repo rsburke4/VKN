@@ -20,6 +20,7 @@
 #include "SwapChain.h"
 #include "RenderPass.h"
 #include "GraphicsPipeline.h"
+#include "FrameBuffer.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -121,7 +122,8 @@ private:
 
 	void cleanupSwapChain() {
 		for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
-			vkDestroyFramebuffer(vknDevice->getDevice(), swapChainFramebuffers[i], nullptr);
+			//vkDestroyFramebuffer(vknDevice->getDevice(), swapChainFramebuffers[i], nullptr);
+			delete(swapChainFramebuffers[i]);
 		}
 
 		for (size_t i = 0; i < swapChainImageViews.size(); i++) {
@@ -193,7 +195,14 @@ private:
 				swapChainImageViews[i]
 			};
 
-			VkFramebufferCreateInfo framebufferInfo{};
+			swapChainFramebuffers[i] = new vkn::FrameBuffer(vknDevice,
+				vknRenderPass,
+				vknSwapChain->getExtent().width,
+				vknSwapChain->getExtent().height,
+				1,
+				swapChainImageViews[i]);
+
+			/*VkFramebufferCreateInfo framebufferInfo{};
 			framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			//framebufferInfo.renderPass = renderPass;
 			framebufferInfo.renderPass = vknRenderPass->getRenderPass();
@@ -206,7 +215,7 @@ private:
 			if (vkCreateFramebuffer(vknDevice->getDevice(), &framebufferInfo, nullptr, &swapChainFramebuffers[i])
 				!= VK_SUCCESS) {
 				throw std::runtime_error("failed to create framebuffer!");
-			}
+			}*/
 		}
 	}
 
@@ -254,7 +263,7 @@ private:
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		//renderPassInfo.renderPass = renderPass;
 		renderPassInfo.renderPass = vknRenderPass->getRenderPass();
-		renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+		renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex]->getFrameBuffer();
 		renderPassInfo.renderArea.offset = { 0, 0 };
 		renderPassInfo.renderArea.extent = vknSwapChain->getExtent();
 
@@ -490,7 +499,8 @@ private:
 	vkn::GraphicsPipeline *vknGraphicsPipeline;
 
 	//Framebuffers
-	std::vector<VkFramebuffer> swapChainFramebuffers;
+	//std::vector<VkFramebuffer> swapChainFramebuffers;
+	std::vector<vkn::FrameBuffer*> swapChainFramebuffers;
 
 	//Command Buffers
 	VkCommandPool commandPool;
