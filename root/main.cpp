@@ -122,7 +122,6 @@ private:
 
 	void cleanupSwapChain() {
 		for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
-			//vkDestroyFramebuffer(vknDevice->getDevice(), swapChainFramebuffers[i], nullptr);
 			delete(swapChainFramebuffers[i]);
 		}
 
@@ -202,20 +201,6 @@ private:
 				1,
 				swapChainImageViews[i]);
 
-			/*VkFramebufferCreateInfo framebufferInfo{};
-			framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			//framebufferInfo.renderPass = renderPass;
-			framebufferInfo.renderPass = vknRenderPass->getRenderPass();
-			framebufferInfo.attachmentCount = 1;
-			framebufferInfo.pAttachments = attachments;
-			framebufferInfo.width = vknSwapChain->getExtent().width;
-			framebufferInfo.height = vknSwapChain->getExtent().height;
-			framebufferInfo.layers = 1;
-
-			if (vkCreateFramebuffer(vknDevice->getDevice(), &framebufferInfo, nullptr, &swapChainFramebuffers[i])
-				!= VK_SUCCESS) {
-				throw std::runtime_error("failed to create framebuffer!");
-			}*/
 		}
 	}
 
@@ -499,7 +484,6 @@ private:
 	vkn::GraphicsPipeline *vknGraphicsPipeline;
 
 	//Framebuffers
-	//std::vector<VkFramebuffer> swapChainFramebuffers;
 	std::vector<vkn::FrameBuffer*> swapChainFramebuffers;
 
 	//Command Buffers
