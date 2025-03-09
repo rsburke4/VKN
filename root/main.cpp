@@ -477,9 +477,6 @@ private:
 	std::vector<VkImageView> swapChainImageViews;
 
 	//Holds the pipeline layout
-	//VkRenderPass renderPass;
-	//VkPipelineLayout pipelineLayout;
-	//VkPipeline graphicsPipeline;
 	vkn::RenderPass *vknRenderPass;
 	vkn::GraphicsPipeline *vknGraphicsPipeline;
 
