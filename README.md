@@ -1,4 +1,4 @@
 # VKN
 Explorations of the Vulikan Graphics API.
 
-Currently an implimentation of the Vulkan Tutorial found here: https://vulkan-tutorial.com/
+The content of this repo is heavily inspired by the material at: https://vulkan-tutorial.com/
