@@ -7,7 +7,7 @@
 namespace vkn {
 
 	//Should convert all of these pointers to const pointers in the future
-	GraphicsPipeline::GraphicsPipeline(LogicalDevice* logicalDevice, RenderPass *pass) {
+	GraphicsPipeline::GraphicsPipeline(LogicalDevice* logicalDevice, RenderPass* pass) {
 		device = logicalDevice;
 		renderPass = pass;
 	}
@@ -58,6 +58,14 @@ namespace vkn {
 		fragmentShader = createShaderModule(shaderCode);
 	}
 
+	void GraphicsPipeline::addBindingDescription(VkVertexInputBindingDescription bind) {
+		bindingDescriptions.push_back(bind);
+	}
+
+	void GraphicsPipeline::addAttributeDescription(VkVertexInputAttributeDescription attr) {
+		attributeDescriptions.push_back(attr);
+	}
+
 	//TODO Add stuff for tesselation shading
 	void GraphicsPipeline::buildPipeline() {
 		//Create Shader Stages
@@ -87,12 +95,14 @@ namespace vkn {
 
 		//Specifies the format of the vertex data input. For the demo, theres no format
 		//This will change later.
+		uint32_t bindCount = bindingDescriptions.size();
+		uint32_t attrCount = attributeDescriptions.size();
 		VkPipelineVertexInputStateCreateInfo vertexCreateInfo{};
 		vertexCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertexCreateInfo.vertexBindingDescriptionCount = 0;
-		vertexCreateInfo.pVertexBindingDescriptions = nullptr;
-		vertexCreateInfo.vertexAttributeDescriptionCount = 0;
-		vertexCreateInfo.pVertexAttributeDescriptions = nullptr;
+		vertexCreateInfo.vertexBindingDescriptionCount = bindCount;
+		vertexCreateInfo.pVertexBindingDescriptions = bindCount > 0 ? bindingDescriptions.data() : nullptr;
+		vertexCreateInfo.vertexAttributeDescriptionCount = attrCount;
+		vertexCreateInfo.pVertexAttributeDescriptions = attrCount > 0 ? attributeDescriptions.data() : nullptr;
 
 		//What kind of primitives to draw, given verties (Assembly stage)
 		VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -156,7 +166,7 @@ namespace vkn {
 		colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
 		/*For above, consider the following pseudocode :
-		* 
+		*
 		if (blendEnable) {
 			finalColor.rgb = (srcColorBlendFactor * newColor.rgb) <colorBlendOp> (dstColorBlendFactor * oldColor.rgb);
 			finalColor.a = (srcAlphaBlendFactor * newColor.a) <alphaBlendOp> (dstAlphaBlendFactor * oldColor.a);
@@ -186,7 +196,7 @@ namespace vkn {
 		colorBlending.blendConstants[1] = 0.0f; //Optional
 		colorBlending.blendConstants[2] = 0.0f; //Optional
 		colorBlending.blendConstants[3] = 0.0f; //Optional
-		
+
 		//Any uniform variables (things that can be passed into a shader as a global
 		// without the need for recreation of recompilation) need to be set up here
 		//Even if we don't have any.

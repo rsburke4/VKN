@@ -1,7 +1,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 
 #include <iostream>
+#include <array>
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
@@ -42,6 +44,47 @@ const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
+
+struct Vertex {
+	glm::vec2 pos;
+	glm::vec3 color;
+
+	//Defines the rate to sample data. How big is each chunk of data etc .
+	static VkVertexInputBindingDescription getBindingDescription() {
+		VkVertexInputBindingDescription bindingDescription{};
+		bindingDescription.binding = 0;
+		bindingDescription.stride = sizeof(Vertex);
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		return bindingDescription;
+	}
+
+	//Defines how to extract data from bindings. We need one for each attr.
+	//Two here, in the case where we care about position and color
+	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
+		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+		//Position description
+		attributeDescriptions[0].binding = 0;
+		attributeDescriptions[0].location = 0;
+		attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+		//Color description
+		attributeDescriptions[1].binding = 0;
+		attributeDescriptions[1].location = 1;
+		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+		return attributeDescriptions;
+
+	}
+};
+
+const std::vector<Vertex> vertices = {
+	{{0.0f, -0.5}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{-0.5f, 0.05f}, {0.0f, 0.0f, 1.0f}}
+};
 
 //Gives a score to physical devices to determine which is best
 //Based on what we want it to do
@@ -401,6 +444,12 @@ private:
 		vknGraphicsPipeline = new vkn::GraphicsPipeline(vknDevice, vknRenderPass);
 		vknGraphicsPipeline->setVertexShader("root/shaders/compiled/vert.spv");
 		vknGraphicsPipeline->setFragmentShader("root/shaders/compiled/frag.spv");
+		auto bindingDescription = Vertex::getBindingDescription();
+		auto attributeDescriptions = Vertex::getAttributeDescriptions();
+		vknGraphicsPipeline->addBindingDescription(bindingDescription);
+		for (size_t i = 0; i < attributeDescriptions.size(); i++) {
+			vknGraphicsPipeline->addAttributeDescription(attributeDescriptions[i]);
+		}
 		vknGraphicsPipeline->buildPipeline();
 
 

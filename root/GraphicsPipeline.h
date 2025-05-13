@@ -23,6 +23,8 @@ namespace vkn{
 		void setVertexShader(std::string vertex);
 		void setTesselationShader(std::string tesselation);
 		void setFragmentShader(std::string fragment);
+		void addBindingDescription(VkVertexInputBindingDescription bind);
+		void addAttributeDescription(VkVertexInputAttributeDescription attr);
 
 		void buildPipeline();
 		VkPipeline getPipeline() { return graphicsPipeline; }
@@ -44,6 +46,9 @@ namespace vkn{
 		VkPipelineLayout pipelineLayout;
 
 		vkn::RenderPass *renderPass;
+
+		std::vector<VkVertexInputBindingDescription> bindingDescriptions;
+		std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 	};
 }
 
