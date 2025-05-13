@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <array>
+
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
@@ -45,6 +46,7 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
+
 struct Vertex {
 	glm::vec2 pos;
 	glm::vec3 color;
@@ -85,6 +87,7 @@ const std::vector<Vertex> vertices = {
 	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
 	{{-0.5f, 0.05f}, {0.0f, 0.0f, 1.0f}}
 };
+
 
 //Gives a score to physical devices to determine which is best
 //Based on what we want it to do

@@ -166,7 +166,6 @@ namespace vkn {
 		colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
 		/*For above, consider the following pseudocode :
-		*
 		if (blendEnable) {
 			finalColor.rgb = (srcColorBlendFactor * newColor.rgb) <colorBlendOp> (dstColorBlendFactor * oldColor.rgb);
 			finalColor.a = (srcAlphaBlendFactor * newColor.a) <alphaBlendOp> (dstAlphaBlendFactor * oldColor.a);
