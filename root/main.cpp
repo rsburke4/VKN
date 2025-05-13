@@ -85,7 +85,7 @@ struct Vertex {
 const std::vector<Vertex> vertices = {
 	{{0.0f, -0.5}, {1.0f, 0.0f, 0.0f}},
 	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-	{{-0.5f, 0.05f}, {0.0f, 0.0f, 1.0f}}
+	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
 };
 
 
@@ -322,7 +322,10 @@ private:
 		scissor.extent = vknSwapChain->getExtent();
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+		VkBuffer vertexBuffers[] = { vertexBuffer };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+		vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
 		vkCmdEndRenderPass(commandBuffer);
 		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -445,7 +448,7 @@ private:
 
 		//createGraphicsPipeline();
 		vknGraphicsPipeline = new vkn::GraphicsPipeline(vknDevice, vknRenderPass);
-		vknGraphicsPipeline->setVertexShader("root/shaders/compiled/vert.spv");
+		vknGraphicsPipeline->setVertexShader("root/shaders/compiled/vertS.spv");
 		vknGraphicsPipeline->setFragmentShader("root/shaders/compiled/frag.spv");
 		auto bindingDescription = Vertex::getBindingDescription();
 		auto attributeDescriptions = Vertex::getAttributeDescriptions();
@@ -458,8 +461,55 @@ private:
 
 		createFramebuffers();
 		createCommandPool();
+		createVertexBuffer();
 		createCommandBuffers();
 		createSyncObjects();
+	}
+
+	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+		VkPhysicalDeviceMemoryProperties memProperties;
+		vkGetPhysicalDeviceMemoryProperties(vknPhysicalDevice->getPhysicalDevice(), &memProperties);
+
+		for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+			if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+				return i;
+			}
+		}
+
+		throw std::runtime_error("failed to find suitable memory type!");
+	}
+
+	//Current implimentation is not very general.
+	//This could be much more generalized
+	void createVertexBuffer() {
+		VkBufferCreateInfo bufferInfo{};
+		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferInfo.size = sizeof(vertices[0]) * vertices.size();
+		bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		if (vkCreateBuffer(vknDevice->getDevice(), &bufferInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create vertex buffer!");
+		}
+
+		//Gather memory requirements and allocate memory
+		VkMemoryRequirements memRequirements;
+		vkGetBufferMemoryRequirements(vknDevice->getDevice(), vertexBuffer, &memRequirements);
+	
+		VkMemoryAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		if (vkAllocateMemory(vknDevice->getDevice(), &allocInfo, nullptr, &vertexBufferMemory) != VK_SUCCESS) {
+			throw std::runtime_error("failed to allocate vertex buffer memory!");
+		}
+		vkBindBufferMemory(vknDevice->getDevice(), vertexBuffer, vertexBufferMemory, 0);
+
+		void* data;
+		vkMapMemory(vknDevice->getDevice(), vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+		memcpy(data, vertices.data(), (size_t) bufferInfo.size);
+		vkUnmapMemory(vknDevice->getDevice(), vertexBufferMemory);
 	}
 
 	void mainLoop() {
@@ -474,6 +524,9 @@ private:
 	//Basically init, but backwards
 	void cleanup() {
 		cleanupSwapChain();
+		vkDestroyBuffer(vknDevice->getDevice(), vertexBuffer, nullptr);
+		vkFreeMemory(vknDevice->getDevice(), vertexBufferMemory, nullptr);
+
 
 		delete(vknGraphicsPipeline);
 		delete(vknRenderPass);
@@ -547,6 +600,10 @@ private:
 
 	//Manually detect when window is resized
 	bool framebufferResized = false;
+
+	//Vertex buffer data
+	VkBuffer vertexBuffer;
+	VkDeviceMemory vertexBufferMemory;
 };
 
 int main() {
