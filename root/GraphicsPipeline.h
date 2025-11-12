@@ -23,6 +23,7 @@ namespace vkn{
 		void setVertexShader(std::string vertex);
 		void setTesselationShader(std::string tesselation);
 		void setFragmentShader(std::string fragment);
+		void addDescriptorSetLayout(VkDescriptorSetLayout &layout);
 		void addBindingDescription(VkVertexInputBindingDescription bind);
 		void addAttributeDescription(VkVertexInputAttributeDescription attr);
 
@@ -47,6 +48,7 @@ namespace vkn{
 
 		vkn::RenderPass *renderPass;
 
+		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 		std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 		std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 	};

@@ -62,6 +62,10 @@ namespace vkn {
 		bindingDescriptions.push_back(bind);
 	}
 
+	void GraphicsPipeline::addDescriptorSetLayout(VkDescriptorSetLayout &layout) {
+		descriptorSetLayouts.push_back(layout);
+	}
+
 	void GraphicsPipeline::addAttributeDescription(VkVertexInputAttributeDescription attr) {
 		attributeDescriptions.push_back(attr);
 	}
@@ -201,8 +205,14 @@ namespace vkn {
 		//Even if we don't have any.
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 0;
-		pipelineLayoutInfo.pSetLayouts = nullptr;
+		int descriptorSetLayoutSize = descriptorSetLayouts.size();
+		pipelineLayoutInfo.setLayoutCount = descriptorSetLayoutSize;
+		if (descriptorSetLayoutSize == 0) {
+			pipelineLayoutInfo.pSetLayouts = nullptr;
+		}
+		else {
+			pipelineLayoutInfo.pSetLayouts = &descriptorSetLayouts[0];
+		}
 		pipelineLayoutInfo.pushConstantRangeCount = 0; //Push constants are another way of passing data to a shader
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -245,6 +255,9 @@ namespace vkn {
 	}
 
 	GraphicsPipeline::~GraphicsPipeline() {
+		for (int i = 0; i < descriptorSetLayouts.size(); i++) {
+			vkDestroyDescriptorSetLayout(device->getDevice(), descriptorSetLayouts[i], nullptr);
+		}
 		vkDestroyPipeline(device->getDevice(), graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(device->getDevice(), pipelineLayout, nullptr);
 	}
