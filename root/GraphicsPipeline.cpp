@@ -62,16 +62,12 @@ namespace vkn {
 		bindingDescriptions.push_back(bind);
 	}
 
-	void GraphicsPipeline::addDescriptorSetLayout(VkDescriptorSetLayout &layout) {
-		descriptorSetLayouts.push_back(layout);
-	}
-
 	void GraphicsPipeline::addAttributeDescription(VkVertexInputAttributeDescription attr) {
 		attributeDescriptions.push_back(attr);
 	}
 
 	//TODO Add stuff for tesselation shading
-	void GraphicsPipeline::buildPipeline() {
+	void GraphicsPipeline::buildPipeline(VkDescriptorSetLayout layout) {
 		//Create Shader Stages
 		VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
 		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -134,7 +130,7 @@ namespace vkn {
 		rasterizer.polygonMode = VK_POLYGON_MODE_FILL; //Determines how fragments are generated. Other modes require GPU featues
 		rasterizer.lineWidth = 1.0f; //How thick a line is in fragments. 1 is good. Thickers requires GPU featues;
 		rasterizer.cullMode = VK_CULL_MODE_BACK_BIT; //Backface culling. Potentially we want to change this for certain materials?
-		rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; //Vertex ordering
+		rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; //Vertex ordering
 		rasterizer.depthBiasEnable = VK_FALSE; //Alter depth values with a bias;
 		rasterizer.depthBiasConstantFactor = 0.0f; //Optional
 		rasterizer.depthBiasClamp = 0.0f; //Optionl
@@ -205,14 +201,8 @@ namespace vkn {
 		//Even if we don't have any.
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		int descriptorSetLayoutSize = descriptorSetLayouts.size();
-		pipelineLayoutInfo.setLayoutCount = descriptorSetLayoutSize;
-		if (descriptorSetLayoutSize == 0) {
-			pipelineLayoutInfo.pSetLayouts = nullptr;
-		}
-		else {
-			pipelineLayoutInfo.pSetLayouts = &descriptorSetLayouts[0];
-		}
+		pipelineLayoutInfo.setLayoutCount = 1;
+		pipelineLayoutInfo.pSetLayouts = &layout;
 		pipelineLayoutInfo.pushConstantRangeCount = 0; //Push constants are another way of passing data to a shader
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -255,9 +245,6 @@ namespace vkn {
 	}
 
 	GraphicsPipeline::~GraphicsPipeline() {
-		for (int i = 0; i < descriptorSetLayouts.size(); i++) {
-			vkDestroyDescriptorSetLayout(device->getDevice(), descriptorSetLayouts[i], nullptr);
-		}
 		vkDestroyPipeline(device->getDevice(), graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(device->getDevice(), pipelineLayout, nullptr);
 	}

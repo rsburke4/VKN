@@ -23,11 +23,10 @@ namespace vkn{
 		void setVertexShader(std::string vertex);
 		void setTesselationShader(std::string tesselation);
 		void setFragmentShader(std::string fragment);
-		void addDescriptorSetLayout(VkDescriptorSetLayout &layout);
 		void addBindingDescription(VkVertexInputBindingDescription bind);
 		void addAttributeDescription(VkVertexInputAttributeDescription attr);
 
-		void buildPipeline();
+		void buildPipeline(VkDescriptorSetLayout layout);
 		VkPipeline getPipeline() { return graphicsPipeline; }
 		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
 
@@ -48,7 +47,8 @@ namespace vkn{
 
 		vkn::RenderPass *renderPass;
 
-		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+		//TODO: Move descriptor sets outside of graphics pipeline.
+		//They can be passed in during pipeline build.
 		std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 		std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 	};
