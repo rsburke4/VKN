@@ -224,28 +224,7 @@ private:
 	void createImageViews() {
 		swapChainImageViews.resize(vknSwapChain->getImages().size());
 		for (size_t i = 0; i < vknSwapChain->getImages().size(); i++) {
-			VkImageViewCreateInfo createInfo{};
-			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			createInfo.image = vknSwapChain->getImages()[i];
-			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			createInfo.format = vknSwapChain->getFormat().format;
-
-			//We can "swizzle" channels around here
-			createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-			//What the image is used for. In this case, color target with no mipmapping and a single layer
-			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			createInfo.subresourceRange.baseMipLevel = 0;
-			createInfo.subresourceRange.levelCount = 1;
-			createInfo.subresourceRange.baseArrayLayer = 0;
-			createInfo.subresourceRange.layerCount = 1;
-
-			if (vkCreateImageView(vknDevice->getDevice(), &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
-				throw std::runtime_error("failed to create image views!");
-			}
+			swapChainImageViews[i] = createImageView(vknSwapChain->getImages()[i], vknSwapChain->getFormat().format);
 		}
 	}
 
@@ -489,6 +468,8 @@ private:
 		createFramebuffers();
 		createCommandPool();
 		createTextureImage();
+		createTextureImageView();
+		createTextureSampler();
 		createVertexBuffer();
 		createIndexBuffer();
 		createUniformBuffers();
@@ -496,6 +477,61 @@ private:
 		createDescriptorSets();
 		createCommandBuffers();
 		createSyncObjects();
+	}
+
+	VkImageView createImageView(VkImage image, VkFormat format) {
+		VkImageViewCreateInfo viewInfo{};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = image;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = format;
+
+		//What the image is used for. In this case, color target with no mipmapping and a single layer
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+
+		VkImageView imageView;
+		if (vkCreateImageView(vknDevice->getDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create image views!");
+		}
+		return imageView;
+	}
+
+	//Images must be viewed through an image view
+	void createTextureImageView() {
+		createImageView(textureImage, VK_FORMAT_R8G8B8_SRGB);
+	}
+
+	void createTextureSampler() {
+		VkSamplerCreateInfo samplerInfo{};
+		samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerInfo.magFilter = VK_FILTER_LINEAR;
+		samplerInfo.minFilter = VK_FILTER_LINEAR;
+		samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+		samplerInfo.anisotropyEnable = VK_TRUE;
+		//We need to get device properties to find out what the max anisotropy param can be
+		VkPhysicalDeviceProperties properties{};
+		vkGetPhysicalDeviceProperties(vknPhysicalDevice->getPhysicalDevice(), &properties);
+		samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+
+		samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		samplerInfo.unnormalizedCoordinates = VK_FALSE;
+		samplerInfo.compareEnable = VK_FALSE;
+		samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+		samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		samplerInfo.mipLodBias = 0.0f;
+		samplerInfo.minLod = 0.0f;
+		samplerInfo.maxLod = 0.0f;
+
+		if (vkCreateSampler(vknDevice->getDevice(), &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create texture sampler!");
+		}
 	}
 
 	void createTextureImage() {
@@ -527,6 +563,9 @@ private:
 		transitionImageLayout(textureImage, VK_FORMAT_R8G8B8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 		copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
 		transitionImageLayout(textureImage, VK_FORMAT_R8G8B8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		
+		vkDestroyBuffer(vknDevice->getDevice(), stagingBuffer, nullptr);
+		vkFreeMemory(vknDevice->getDevice(), stagingBufferMemory, nullptr);
 	}
 
 	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
@@ -875,6 +914,8 @@ private:
 		delete(vknGraphicsPipeline);
 		delete(vknRenderPass);
 
+		vkDestroySampler(vknDevice->getDevice(), textureSampler, nullptr);
+		vkDestroyImageView(vknDevice->getDevice(), textureImageView, nullptr);
 		vkDestroyImage(vknDevice->getDevice(), textureImage, nullptr);
 		vkFreeMemory(vknDevice->getDevice(), textureImageMemory, nullptr);
 
@@ -982,7 +1023,9 @@ private:
 	//Texturing Properties
 	VkImage textureImage;
 	VkDeviceMemory textureImageMemory;
-	
+	VkImageView textureImageView;
+	VkSampler textureSampler;
+
 };
 
 int main() {

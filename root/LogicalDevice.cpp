@@ -28,6 +28,8 @@ namespace vkn {
 
 		//Select the features from the PhysicalDevice we want to add to the Logical Device
 		VkPhysicalDeviceFeatures deviceFeatures{};
+		deviceFeatures.samplerAnisotropy = VK_TRUE;
+
 		std::vector<const char*> extensions = physicalDevice->getDeviceExtensions();
 
 		VkDeviceCreateInfo createInfo{};

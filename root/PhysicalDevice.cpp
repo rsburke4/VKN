@@ -108,6 +108,9 @@ SwapChainSupportDetails PhysicalDevice::querySwapChainSupport(VkSurfaceKHR surfa
 //Picks the device with the support we want
 //This includes queue families and such.
 bool PhysicalDevice::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface) {
+	VkPhysicalDeviceFeatures supportedFeatures;
+	vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
 	QueueFamilyIndices indices = findQueueFamilies(device, surface);
 	bool extensionsSupported = checkDeviceExtensionSupport(device);
 	bool swapChainAdequate = false;
@@ -115,5 +118,5 @@ bool PhysicalDevice::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surf
 		swapChainSupport = querySwapChainSupport(device, surface);
 		swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
 	}
-	return indices.isComplete() && extensionsSupported && swapChainAdequate;
+	return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
 }
